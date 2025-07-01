@@ -1,0 +1,2 @@
+# ai-engine 폴더 기준, 상위 폴더로 나갔다가 models 폴더로 들어가는 경로
+FROM ../models/llama-3-Korean-Bllossom-8B-gguf-Q4_K_M/llama-3-Korean-Bllossom-8B-Q4_K_M.gguf

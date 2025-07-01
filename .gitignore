@@ -1,0 +1,58 @@
+# # # 중요 정보 (Secrets) # # #
+# API 키, 데이터베이스 비밀번호 등 민감한 정보가 담긴 .env 파일
+# 이 파일은 절대로 Git에 올리면 안 됩니다.
+.env
+
+# # # 데이터, 모델, 인덱스 파일 (Build Artifacts & Data) # # #
+# 수동으로 다운로드한 대용량 모델 파일
+# models 폴더와 그 안의 모든 내용을 무시
+/models/
+
+# create_index.py 실행 시 생성되는 FAISS 인덱스 폴더
+# 이 폴더는 데이터로부터 재생성 가능하며 용량이 큽니다.
+/ai-engine/faiss_index/
+
+# 데이터 수집 시 생성될 수 있는 CSV, JSON 파일
+*.csv
+*.json
+
+# # # 설치 파일 (Installers) # # #
+# Miniconda 설치 스크립트 파일
+Miniconda3-latest-Linux-x86_64.sh*
+
+# # # 가상환경 (Virtual Environments) # # #
+# Conda 가상환경 폴더 (minwon_ai 등)
+.conda/
+# Python venv 가상환경 폴더
+.venv/
+venv/
+ENV/
+
+# # # Python 캐시 및 빌드 파일 # # #
+# Python 캐시 파일
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Python 빌드/배포 관련 폴더
+build/
+dist/
+*.egg-info/
+sdist/
+eggs/
+*.egg
+
+# # # IDE 및 에디터 설정 # # #
+# Visual Studio Code
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+!.vscode/launch.json
+
+# # # 운영체제(OS) 및 기타 파일 # # #
+# macOS
+.DS_Store
+
+# Windows
+Thumbs.db
