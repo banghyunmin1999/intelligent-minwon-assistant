@@ -2,7 +2,7 @@ import os
 from dotenv import load_dotenv
 from fastapi import FastAPI
 from pydantic import BaseModel
-from langchain_community.embeddings import HuggingFaceEmbeddings
+from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_community.chat_models import ChatOllama
 from langchain_community.vectorstores import FAISS
 from langchain.prompts import ChatPromptTemplate
@@ -32,7 +32,7 @@ embeddings = HuggingFaceEmbeddings(
 
 # 2. 저장된 FAISS 인덱스 로드
 # allow_dangerous_deserialization=True 옵션은 로컬 인덱스를 신뢰하고 로드하기 위해 필요합니다.
-vector_store = FAISS.load_local("ai-engine/faiss_index", embeddings, allow_dangerous_deserialization=True)
+vector_store = FAISS.load_local("faiss_index", embeddings, allow_dangerous_deserialization=True)
 
 # 3. Retriever(검색기) 생성: 유사도가 높은 상위 5개의 문서를 검색하도록 설정
 retriever = vector_store.as_retriever(search_kwargs={"k": 5})
