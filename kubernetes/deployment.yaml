@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: minwon-assistant
+  labels:
+    app: minwon-assistant
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: minwon-assistant
+  template:
+    metadata:
+      labels:
+        app: minwon-assistant
+    spec:
+      containers:
+      - name: minwon-assistant
+        image: your-docker-repo/minwon-assistant:latest
+        ports:
+        - containerPort: 8000
+        env:
+        - name: DB_HOST
+          valueFrom:
+            secretKeyRef:
+              name: minwon-assistant-secrets
+              key: db_host
+        - name: DB_PORT
+          valueFrom:
+            secretKeyRef:
+              name: minwon-assistant-secrets
+              key: db_port
+        resources:
+          limits:
+            nvidia.com/gpu: 1
+            memory: "8Gi"
+            cpu: "2"
+          requests:
+            nvidia.com/gpu: 1
+            memory: "4Gi"
+            cpu: "1"
