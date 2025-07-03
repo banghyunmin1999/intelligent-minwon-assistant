@@ -52,16 +52,90 @@ template = """
 """
 prompt = ChatPromptTemplate.from_template(template)
 
-# 5. LLM 모델 정의 (Ollama 로컬 모델 사용)
-# 중요: model 이름은 'ollama create' 명령어로 최종 성공한 모델 이름과 정확히 일치해야 합니다.
-llm = ChatOllama(model="bllossom:latest") 
+class LlamaCppLLM:
+    def __init__(self, model_path: str):
+        self.model_path = model_path
+        self.process = None
+
+    def start(self):
+        """llama.cpp 프로세스를 시작합니다."""
+        self.process = subprocess.Popen(
+            [
+                "/home/bang/llama.cpp/build/bin/llama-cli",
+                "--model",
+                self.model_path,
+                "--interactive",
+                "--threads",
+                "12",
+                "--n_ctx",
+                "4096",
+                "--n_batch",
+                "2048"
+            ],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True
+        )
+
+    def generate(self, prompt: str) -> str:
+        """프롬프트를 입력하고 응답을 생성합니다."""
+        if not self.process:
+            self.start()
+
+        # 프롬프트 입력
+        self.process.stdin.write(prompt + "\n")
+        self.process.stdin.flush()
+
+        # 응답 읽기
+        response = []
+        while True:
+            line = self.process.stdout.readline()
+            if not line:
+                break
+            response.append(line)
+
+        return "".join(response)
+
+    def close(self):
+        """프로세스를 종료합니다."""
+        if self.process:
+            self.process.stdin.close()
+            self.process.terminate()
+            self.process.wait()
+            self.process = None
+
+# 5. LLM 모델 정의 (llama.cpp 사용)
+llm = LlamaCppLLM(
+    model_path="/home/bang/intelligent-minwon-assistant/models/llama-3-Korean-Bllossom-8B-gguf-Q4_K_M/llama-3-Korean-Bllossom-8B-Q4_K_M.gguf"
+) 
 
 # 6. RAG 체인(Chain) 구성
+def generate_response(prompt: str):
+    """프롬프트를 받아 응답을 생성합니다."""
+    try:
+        # llama.cpp 프로세스를 시작합니다
+        llm.start()
+        
+        # 프롬프트를 생성합니다
+        full_prompt = prompt + "\n"
+        
+        # 응답을 생성합니다
+        response = llm.generate(full_prompt)
+        
+        # 프로세스를 종료합니다
+        llm.close()
+        
+        return response
+    except Exception as e:
+        print(f"오류 발생: {e}")
+        return "오류가 발생했습니다."
+
+# RAG 체인을 수정하여 새로운 함수를 사용하도록 합니다
 rag_chain = (
     {"context": retriever, "question": RunnablePassthrough()}
     | prompt
-    | llm
-    | StrOutputParser()
+    | generate_response
 )
 
 print("✅ AI 엔진 초기화 완료.")
