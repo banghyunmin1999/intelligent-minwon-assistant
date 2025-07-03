@@ -24,6 +24,29 @@ intelligent-minwon-assistant/
    - Python 3.8 이상이 필요합니다.
    - 필요한 패키지는 `requirements.txt`에 정의되어 있습니다.
 
+3. llama.cpp 설치 및 빌드
+   ```bash
+   # 필요한 패키지들은 이미 설치되어 있습니다:
+   # - build-essential
+   # - cmake
+   # - make
+   # - libcurl
+
+   # llama.cpp 클론 및 빌드
+   git clone https://github.com/ggerganov/llama.cpp
+   cd llama.cpp
+   mkdir -p build
+   cd build
+   cmake ..
+   make -j$(nproc)
+   ```
+
+4. 모델 실행
+   ```bash
+   # 모델 실행 명령어
+   /home/bang/llama.cpp/build/bin/llama-cli --model /home/bang/intelligent-minwon-assistant/models/llama-3-Korean-Bllossom-8B-gguf-Q4_K_M/llama-3-Korean-Bllossom-8B-Q4_K_M.gguf
+   ```
+
 ## 사용법
 
 프로젝트의 주요 기능과 사용 방법을 설명합니다.
@@ -37,4 +60,4 @@ intelligent-minwon-assistant/
 
 ## 버전 관리
 
-- v1.0.0: 초기 버전
+- v2.1.0: 모델 실행 명령어 및 설치 가이드 추가
