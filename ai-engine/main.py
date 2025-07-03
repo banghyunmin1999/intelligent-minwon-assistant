@@ -22,7 +22,7 @@ print("AI 엔진 초기화를 시작합니다...")
 
 # 임베딩 모델 로드
 try:
-    embeddings = HuggingFaceEmbeddings(
+    embeddings_model = HuggingFaceEmbeddings(
         model_name="jhgan/ko-sbert-nli",
         model_kwargs={'device': 'cpu'},
         encode_kwargs={'normalize_embeddings': True}
@@ -47,12 +47,12 @@ except Exception as e:
 
 
 # PGVector 스토어 초기화
-# *** 핵심 수정: 구버전과 호환되는 직접 생성자 방식으로 변경 ***
+# *** 최종 수정: 사용자의 환경에 맞는 정확한 파라미터 이름 사용 ***
 try:
     vector_store = PGVector(
-        connection_string=PG_CONNECTION_STRING,
-        embedding_function=embeddings, # 구버전 파라미터 이름 사용
+        embeddings=embeddings_model,          # 'embedding_function' 이나 'embedding' 이 아닌 'embeddings'
         collection_name="minwon_qna_cases",
+        connection=PG_CONNECTION_STRING,    # 'connection_string' 이 아닌 'connection'
     )
     print("✅ PostgreSQL Q&A 벡터 스토어에 성공적으로 연결했습니다.")
 except Exception as e:
