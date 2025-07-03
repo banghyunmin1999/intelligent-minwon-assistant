@@ -17,6 +17,9 @@
 *.json
 
 # # # 설치 파일 (Installers) # # #
+# 가상환경 디렉토리
+venv/
+
 # Miniconda 설치 스크립트 파일
 Miniconda3-latest-Linux-x86_64.sh*
 

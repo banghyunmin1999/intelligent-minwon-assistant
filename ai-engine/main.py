@@ -56,12 +56,42 @@ class LlamaCppLLM:
     def __init__(self, model_path: str):
         self.model_path = model_path
         self.process = None
+        self.use_gpu = False
+        
+        # GPU 사용 가능성을 체크
+        try:
+            if torch.cuda.is_available():
+                # CUDA가 사용 가능한지 확인
+                device_count = torch.cuda.device_count()
+                if device_count > 0:
+                    print(f"GPU 사용 가능: {device_count}개의 GPU가 발견되었습니다.")
+                    self.use_gpu = True
+                else:
+                    print("GPU는 사용 가능하지만, CUDA가 설치되어 있지 않습니다.")
+            else:
+                print("GPU를 사용할 수 없습니다. CPU로 실행됩니다.")
+        except Exception as e:
+            print(f"GPU 체크 중 오류 발생: {e}")
+            print("GPU를 사용할 수 없습니다. CPU로 실행됩니다.")
 
     def start(self):
         """llama.cpp 프로세스를 시작합니다."""
-        self.process = subprocess.Popen(
-            [
-                "/home/bang/llama.cpp/build/bin/llama-cli",
+        cmd = [
+            "/home/bang/llama.cpp/build/bin/llama-cli",
+            "--model",
+            self.model_path,
+            "--interactive",
+            "--threads",
+            "12",
+            "--n_ctx",
+            "4096",
+            "--n_batch",
+            "2048"
+        ]
+
+        # GPU 사용 가능하면 GPU 옵션 추가
+        if self.use_gpu:
+            cmd.extend([
                 "--model",
                 self.model_path,
                 "--interactive",
@@ -70,7 +100,10 @@ class LlamaCppLLM:
                 "--n_ctx",
                 "4096",
                 "--n_batch",
-                "2048"
+                "2048",
+                "--gpu",
+                "--n_gpu_layers",
+                "40"
             ],
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
