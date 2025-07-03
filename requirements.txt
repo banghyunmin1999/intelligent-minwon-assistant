@@ -1,13 +1,23 @@
-python-dotenv==1.0.0
-fastapi==0.109.0
-uvicorn==0.27.0
-torch==2.7.1
-transformers==4.36.2
-langchain==0.3.26
-langchain-community==0.3.27
-psutil==5.9.8
-mysql-connector-python==8.2.0
-psycopg2-binary==2.9.9
-sentence-transformers==2.2.2
-numpy==1.26.3
-python-dotenv==1.0.0
+# FastAPI 서버
+fastapi
+uvicorn[standard]
+
+# 환경변수 관리
+python-dotenv
+
+# LangChain 및 RAG 관련
+langchain
+langchain-community
+langchain-huggingface
+langchain-postgres
+
+# DB 및 PDF
+psycopg
+PyPDF2
+
+# LLM 및 임베딩
+llama-cpp-python
+sentence-transformers
+
+# 기타
+numpy

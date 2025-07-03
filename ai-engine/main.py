@@ -1,183 +1,132 @@
 import os
+import sys
 from dotenv import load_dotenv
 from fastapi import FastAPI
 from pydantic import BaseModel
+from typing import List
+
+# LangChain 및 관련 라이브러리 임포트
+from langchain_core.documents import Document
 from langchain_huggingface import HuggingFaceEmbeddings
-from langchain_community.chat_models import ChatOllama
-from langchain_community.vectorstores import FAISS
+from langchain_community.llms import LlamaCpp
+from langchain_postgres.vectorstores import PGVector
 from langchain.prompts import ChatPromptTemplate
-from langchain.schema.runnable import RunnablePassthrough
+from langchain.schema.runnable import RunnablePassthrough, RunnableLambda
 from langchain.schema.output_parser import StrOutputParser
 
 # .env 파일에서 환경 변수를 로드합니다.
 load_dotenv()
 
-# FastAPI 앱을 초기화합니다.
-app = FastAPI()
+# --- 1. 전역 설정 및 모델/DB 연결 ---
+print("AI 엔진 초기화를 시작합니다...")
 
-# API 요청 시 받을 데이터 모델을 정의합니다.
-class Question(BaseModel):
-    query: str
+# 임베딩 모델 로드
+try:
+    embeddings = HuggingFaceEmbeddings(
+        model_name="jhgan/ko-sbert-nli",
+        model_kwargs={'device': 'cpu'},
+        encode_kwargs={'normalize_embeddings': True}
+    )
+except Exception as e:
+    print(f"임베딩 모델 로드 중 오류 발생: {e}")
+    sys.exit()
 
-# --- LangChain RAG 파이프라인 설정 ---
+# PostgreSQL 연결 정보
+try:
+    PG_CONNECTION_STRING = PGVector.connection_string_from_db_params(
+        driver="psycopg",
+        host=os.getenv("PG_HOST", "localhost"),
+        port=int(os.getenv("PG_PORT", "5432")),
+        database=os.getenv("PG_DB_NAME", "minwon_pg_db"),
+        user=os.getenv("PG_USER", "minwon_user"),
+        password=os.getenv("PG_PASSWORD", "1234"),
+    )
+except Exception as e:
+    print(f"DB 연결 문자열 생성 중 오류 발생: {e}")
+    sys.exit()
 
-print("AI 엔진 초기화 중...")
 
-# 1. 임베딩 모델 로드 (create_index.py와 동일한 모델 사용)
-embeddings = HuggingFaceEmbeddings(
-    model_name="jhgan/ko-sbert-nli",
-    model_kwargs={'device': 'cuda'},
-    encode_kwargs={'normalize_embeddings': True}
-)
+# PGVector 스토어 초기화
+# *** 핵심 수정: 구버전과 호환되는 직접 생성자 방식으로 변경 ***
+try:
+    vector_store = PGVector(
+        connection_string=PG_CONNECTION_STRING,
+        embedding_function=embeddings, # 구버전 파라미터 이름 사용
+        collection_name="minwon_qna_cases",
+    )
+    print("✅ PostgreSQL Q&A 벡터 스토어에 성공적으로 연결했습니다.")
+except Exception as e:
+    print(f"❌ PostgreSQL 벡터 스토어 연결 실패: {e}")
+    sys.exit()
 
-# 2. 저장된 FAISS 인덱스 로드
-# allow_dangerous_deserialization=True 옵션은 로컬 인덱스를 신뢰하고 로드하기 위해 필요합니다.
-vector_store = FAISS.load_local("faiss_index", embeddings, allow_dangerous_deserialization=True)
 
-# 3. Retriever(검색기) 생성: 유사도가 높은 상위 5개의 문서를 검색하도록 설정
-retriever = vector_store.as_retriever(search_kwargs={"k": 5})
+# Retriever(검색기) 생성
+retriever = vector_store.as_retriever(search_kwargs={"k": 3})
 
-# 4. Prompt Template 정의
+# Prompt Template 정의
 template = """
-당신은 대한민국 민원 담당 공무원입니다. 주어진 '유사 민원 사례'를 바탕으로 사용자의 '질문'에 대해 친절하고 논리적으로 답변을 생성해야 합니다.
-근거가 되는 사례를 문장에 포함하여 답변하면 좋습니다. 만약 유사 사례에서 답을 찾을 수 없다면, "관련된 유사 사례를 찾을 수 없어 정확한 답변이 어렵습니다." 라고 솔직하게 답변하세요.
+당신은 대한민국 농지법 전문 공무원입니다. 사용자의 질문에 대해, 아래에 주어진 '유사 민원 사례와 공식 답변'을 바탕으로 가장 정확하고 전문적인 답변을 생성해야 합니다.
+반드시 주어진 공식 답변의 내용과 법적 근거를 활용하여 답변을 구성하고, 원본 사례의 어조를 참고하여 친절하게 설명하세요.
+주어진 사례에서 답을 찾을 수 없다면, "관련된 사례를 찾을 수 없어 정확한 답변이 어렵습니다." 라고 솔직하게 답변하세요.
 
-[유사 민원 사례]
+[유사 민원 사례와 공식 답변]
 {context}
 
-[질문]
+[사용자 질문]
 {question}
 
-[답변]
+[전문가 답변]
 """
 prompt = ChatPromptTemplate.from_template(template)
 
-class LlamaCppLLM:
-    def __init__(self, model_path: str):
-        self.model_path = model_path
-        self.process = None
-        self.use_gpu = False
+# LlamaCpp LLM 모델 로드
+try:
+    llm = LlamaCpp(
+        model_path="/home/bang/intelligent-minwon-assistant/models/llama-3-Korean-Bllossom-8B-gguf-Q4_K_M/llama-3-Korean-Bllossom-8B-Q4_K_M.gguf",
+        n_gpu_layers=40,
+        n_batch=2048,
+        n_ctx=4096,
+        max_tokens=1024,
+        temperature=0.7,
+        verbose=True,
+    )
+except Exception as e:
+    print(f"LlamaCpp 모델 로드 중 오류 발생: {e}")
+    exit()
+
+# --- 2. RAG 체인 업그레이드 ---
+
+def format_docs(docs: List[Document]) -> str:
+    """검색된 Document 객체들을 프롬프트에 넣기 좋은 형태로 변환합니다."""
+    formatted_strings = []
+    for i, doc in enumerate(docs):
+        question_content = doc.page_content
+        answer_content = doc.metadata.get('answer', '답변 정보 없음')
         
-        # GPU 사용 가능성을 체크
-        try:
-            if torch.cuda.is_available():
-                # CUDA가 사용 가능한지 확인
-                device_count = torch.cuda.device_count()
-                if device_count > 0:
-                    print(f"GPU 사용 가능: {device_count}개의 GPU가 발견되었습니다.")
-                    self.use_gpu = True
-                else:
-                    print("GPU는 사용 가능하지만, CUDA가 설치되어 있지 않습니다.")
-            else:
-                print("GPU를 사용할 수 없습니다. CPU로 실행됩니다.")
-        except Exception as e:
-            print(f"GPU 체크 중 오류 발생: {e}")
-            print("GPU를 사용할 수 없습니다. CPU로 실행됩니다.")
+        formatted_strings.append(f"--- 사례 {i+1} ---\n사례 질문: {question_content}\n공식 답변: {answer_content}")
+    return "\n\n".join(formatted_strings)
 
-    def start(self):
-        """llama.cpp 프로세스를 시작합니다."""
-        cmd = [
-            "/home/bang/llama.cpp/build/bin/llama-cli",
-            "--model",
-            self.model_path,
-            "--interactive",
-            "--threads",
-            "12",
-            "--n_ctx",
-            "4096",
-            "--n_batch",
-            "2048"
-        ]
-
-        # GPU 사용 가능하면 GPU 옵션 추가
-        if self.use_gpu:
-            cmd.extend([
-                "--model",
-                self.model_path,
-                "--interactive",
-                "--threads",
-                "12",
-                "--n_ctx",
-                "4096",
-                "--n_batch",
-                "2048",
-                "--gpu",
-                "--n_gpu_layers",
-                "40"
-            ],
-            stdin=subprocess.PIPE,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True
-        )
-
-    def generate(self, prompt: str) -> str:
-        """프롬프트를 입력하고 응답을 생성합니다."""
-        if not self.process:
-            self.start()
-
-        # 프롬프트 입력
-        self.process.stdin.write(prompt + "\n")
-        self.process.stdin.flush()
-
-        # 응답 읽기
-        response = []
-        while True:
-            line = self.process.stdout.readline()
-            if not line:
-                break
-            response.append(line)
-
-        return "".join(response)
-
-    def close(self):
-        """프로세스를 종료합니다."""
-        if self.process:
-            self.process.stdin.close()
-            self.process.terminate()
-            self.process.wait()
-            self.process = None
-
-# 5. LLM 모델 정의 (llama.cpp 사용)
-llm = LlamaCppLLM(
-    model_path="/home/bang/intelligent-minwon-assistant/models/llama-3-Korean-Bllossom-8B-gguf-Q4_K_M/llama-3-Korean-Bllossom-8B-Q4_K_M.gguf"
-) 
-
-# 6. RAG 체인(Chain) 구성
-def generate_response(prompt: str):
-    """프롬프트를 받아 응답을 생성합니다."""
-    try:
-        # llama.cpp 프로세스를 시작합니다
-        llm.start()
-        
-        # 프롬프트를 생성합니다
-        full_prompt = prompt + "\n"
-        
-        # 응답을 생성합니다
-        response = llm.generate(full_prompt)
-        
-        # 프로세스를 종료합니다
-        llm.close()
-        
-        return response
-    except Exception as e:
-        print(f"오류 발생: {e}")
-        return "오류가 발생했습니다."
-
-# RAG 체인을 수정하여 새로운 함수를 사용하도록 합니다
 rag_chain = (
-    {"context": retriever, "question": RunnablePassthrough()}
+    {"context": retriever | RunnableLambda(format_docs), "question": RunnablePassthrough()}
     | prompt
-    | generate_response
+    | llm
+    | StrOutputParser()
 )
 
-print("✅ AI 엔진 초기화 완료.")
+print("✅ AI 엔진 초기화 완료. API 서버가 준비되었습니다.")
 
-# --- API 엔드포인트 정의 ---
+# --- 3. FastAPI 앱 설정 ---
+app = FastAPI(
+    title="지능형 농지민원 답변 API (사례집 기반)",
+    description="농지민원 사례집 PDF의 지식을 기반으로 답변하는 RAG API입니다.",
+    version="3.0.0",
+)
 
-@app.post("/ask")
+class Question(BaseModel):
+    query: str
+
+@app.post("/ask", summary="질문/답변 생성")
 async def ask_question(question: Question):
-    """사용자의 질문을 받아 RAG 체인을 통해 답변을 생성합니다."""
     print(f"수신된 질문: {question.query}")
     try:
         answer = rag_chain.invoke(question.query)
@@ -187,6 +136,6 @@ async def ask_question(question: Question):
         print(f"오류 발생: {e}")
         return {"error": "답변을 생성하는 중 오류가 발생했습니다."}
 
-@app.get("/")
+@app.get("/", summary="API 상태 확인")
 def read_root():
-    return {"message": "민원분석 AI 엔진 API 서버입니다. /docs 로 접속하여 테스트할 수 있습니다."}
+    return {"message": "지능형 농지민원 답변 API 서버가 정상적으로 실행 중입니다."}
