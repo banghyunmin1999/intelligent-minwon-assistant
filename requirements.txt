@@ -16,7 +16,7 @@ psycopg
 PyPDF2
 
 # LLM 및 임베딩
-llama-cpp-python
+# llama-cpp-python (GPU 가속은 별도 빌드 필요)
 sentence-transformers
 
 # 기타
