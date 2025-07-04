@@ -1,0 +1,18 @@
+# =================================================================
+# Service: AI 엔진 Pod에 접근할 수 있는 내부 네트워크 주소를 생성합니다.
+# =================================================================
+apiVersion: v1
+kind: Service
+metadata:
+  name: ai-engine-service
+  namespace: minwon-system
+spec:
+  # ClusterIP: 클러스터 내부에서만 접근 가능한 IP를 할당합니다. (기본값)
+  type: ClusterIP
+  ports:
+    # 서비스의 80번 포트로 오는 요청을, 컨테이너의 8000번 포트로 전달합니다.
+    - port: 80
+      targetPort: 8000
+  selector:
+    # 'app: ai-engine' 레이블을 가진 Pod을 이 서비스와 연결합니다.
+    app: ai-engine

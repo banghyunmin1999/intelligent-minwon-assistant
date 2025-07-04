@@ -1,0 +1,29 @@
+# =================================================================
+# ConfigMap: AI 엔진의 일반 설정을 정의합니다.
+# - 데이터베이스 연결 정보 등 민감한 정보는 모두 Secret으로 이동했습니다.
+# =================================================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ai-engine-config
+  # 'minwon-system' 네임스페이스에 리소스를 생성하여 프로젝트를 논리적으로 분리합니다.
+  namespace: minwon-system
+data:
+  # Embedding Model Settings
+  EMBEDDING_MODEL: "jhgan/ko-sbert-nli"
+  EMBEDDING_DEVICE: "cpu"
+
+  # LLM Model Settings
+  # 모델 파일은 나중에 PersistentVolume을 통해 컨테이너의 /models 경로에 마운트될 예정입니다.
+  LLM_MODEL_PATH: "/models/llama-3-Korean-Bllossom-8B-gguf-Q4_K_M/llama-3-Korean-Bllossom-8B-Q4_K_M.gguf"
+  LLM_N_GPU_LAYERS: "40"
+  LLM_N_CTX: "4096"
+  LLM_MAX_TOKENS: "768"
+  LLM_TEMPERATURE: "0.5"
+
+  # VectorDB (PostgreSQL) Settings
+  PG_DRIVER: "postgresql+asyncpg"
+  # PG_HOST는 쿠버네티스 내부에서 PostgreSQL 서비스가 사용할 이름입니다.
+  PG_HOST: "postgres-service"
+  PG_PORT: "5432"
+  COLLECTION_NAME: "minwon_qna_cases"

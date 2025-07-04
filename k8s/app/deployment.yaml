@@ -1,0 +1,43 @@
+# =================================================================
+# Deployment: AI 엔진 애플리케이션을 배포하고 관리합니다. (임시 수정)
+# - 모델 파일 복사를 위해 컨테이너가 바로 종료되지 않도록 command를 추가합니다.
+# =================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ai-engine
+  namespace: minwon-system
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ai-engine
+  template:
+    metadata:
+      labels:
+        app: ai-engine
+    spec:
+      containers:
+        - name: ai-engine-container
+          image: banghyunmin1999/minwon-ai-engine:1.0
+          ports:
+            - containerPort: 8000
+          envFrom:
+            - configMapRef:
+                name: ai-engine-config
+            - secretRef:
+                name: ai-engine-secrets
+          resources:
+            requests:
+              memory: "4Gi"
+              cpu: "1000m"
+            limits:
+              memory: "8Gi"
+              cpu: "2000m"
+          volumeMounts:
+            - name: model-storage
+              mountPath: /models
+      volumes:
+        - name: model-storage
+          persistentVolumeClaim:
+            claimName: model-pvc
