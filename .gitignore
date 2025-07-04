@@ -30,6 +30,7 @@ Miniconda3-latest-Linux-x86_64.sh*
 .venv/
 venv/
 ENV/
+kopo_venv/
 
 # # # Python 캐시 및 빌드 파일 # # #
 # Python 캐시 파일
