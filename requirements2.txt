@@ -1,0 +1,29 @@
+# FastAPI Web Server
+fastapi
+uvicorn[standard]
+
+# Configuration
+python-dotenv
+pydantic-settings
+
+# LangChain Core
+langchain
+langchain-community
+langchain-core
+
+# LangChain Integrations
+langchain-huggingface
+langchain-postgres
+
+# VectorDB & PDF
+psycopg[binary]
+asyncpg
+sqlalchemy
+PyPDF2
+pgvector
+rank_bm25
+
+# ML & Data
+torch
+numpy
+sentence-transformers

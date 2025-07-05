@@ -1,29 +1,21 @@
-# FastAPI Web Server
+# --- 웹 프레임워크 및 서버 ---
 fastapi
 uvicorn[standard]
+pydantic
 
-# Configuration
-python-dotenv
-pydantic-settings
-
-# LangChain Core
+# --- LangChain 및 AI 모델 ---
 langchain
-langchain-community
-langchain-core
-
-# LangChain Integrations
 langchain-huggingface
-langchain-postgres
-
-# VectorDB & PDF
-psycopg[binary]
-asyncpg
-sqlalchemy
-PyPDF2
-pgvector
-rank_bm25
-
-# ML & Data
-torch
-numpy
 sentence-transformers
+langchain-postgres
+llama-cpp-python
+
+# --- 데이터베이스 연결 ---
+psycopg2-binary
+asyncpg # 비동기 드라이버 추가
+
+# --- 유틸리티 ---
+python-dotenv
+
+# --- GPU 체크 및 사용 ---
+torch
