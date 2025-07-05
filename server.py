@@ -1,4 +1,4 @@
-# server.py (클래스 레벨 몽키 패칭 적용 최종 버전)
+# server.py (검색된 벡터DB 문서 로그 출력 포함 최종 버전)
 
 import os
 from dotenv import load_dotenv
@@ -12,6 +12,7 @@ from langchain_huggingface import HuggingFaceEmbeddings
 import torch
 from contextlib import asynccontextmanager
 from sqlalchemy.ext.asyncio import create_async_engine
+from fastapi.middleware.cors import CORSMiddleware
 
 # --- 1. .env 파일 로드 ---
 dotenv_path = os.path.join(os.path.dirname(__file__), '.env')
@@ -94,7 +95,13 @@ async def lifespan(app: FastAPI):
 
 # --- 6. FastAPI 앱 생성 및 lifespan 연결 ---
 app = FastAPI(lifespan=lifespan)
-
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # 또는 실제 허용할 도메인 리스트
+    allow_credentials=True,
+    allow_methods=["*"],  # 모든 메서드 허용
+    allow_headers=["*"],  # 모든 헤더 허용
+)
 # --- 7. API 엔드포인트 ---
 class QuestionRequest(BaseModel):
     question: str
@@ -111,6 +118,16 @@ async def ask_question(request: QuestionRequest):
         return {"error": "서버가 아직 준비 중입니다. 잠시 후 다시 시도해주세요."}
 
     docs = await retriever.ainvoke(user_question)
+
+    # --- 벡터DB에서 검색된 문서 로그로 출력 ---
+    print("\n[벡터DB에서 검색된 문서]")
+    for i, doc in enumerate(docs, 1):
+        print(f"--- 문서 {i} ---")
+        print(doc.page_content)
+        if hasattr(doc, "metadata"):
+            print(f"[metadata]: {doc.metadata}")
+        print("---------------")
+
     context = "\n---\n".join([doc.page_content for doc in docs])
 
     # 프롬프트 개선
