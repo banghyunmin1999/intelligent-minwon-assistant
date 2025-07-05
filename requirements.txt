@@ -1,23 +1,29 @@
-# FastAPI 서버
+# FastAPI Web Server
 fastapi
 uvicorn[standard]
 
-# 환경변수 관리
+# Configuration
 python-dotenv
+pydantic-settings
 
-# LangChain 및 RAG 관련
+# LangChain Core
 langchain
 langchain-community
+langchain-core
+
+# LangChain Integrations
 langchain-huggingface
 langchain-postgres
 
-# DB 및 PDF
-psycopg
+# VectorDB & PDF
+psycopg[binary]
+asyncpg
+sqlalchemy
 PyPDF2
+pgvector
+rank_bm25
 
-# LLM 및 임베딩
-# llama-cpp-python (GPU 가속은 별도 빌드 필요)
-sentence-transformers
-
-# 기타
+# ML & Data
+torch
 numpy
+sentence-transformers
