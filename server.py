@@ -1,5 +1,3 @@
-# server.py (후처리 수정 최종 버전)
-
 import os
 from dotenv import load_dotenv
 import uvicorn
@@ -30,7 +28,8 @@ PG_PORT = os.getenv("DB_PORT")
 PG_DATABASE = os.getenv("DB_NAME")
 PG_USER = os.getenv("DB_USER")
 PG_PASSWORD = os.getenv("DB_PASSWORD")
-COLLECTION_NAME = "minwon_pdf_cases_v2" 
+# ★ 컬렉션 이름을 v3로 변경
+COLLECTION_NAME = "minwon_pdf_cases_v3" 
 CONNECTION_STRING = f"postgresql+asyncpg://{PG_USER}:{PG_PASSWORD}@{PG_HOST}:{PG_PORT}/{PG_DATABASE}"
 model_path = os.getenv("MODEL_PATH")
 N_GPU_LAYERS = int(os.getenv("N_GPU_LAYERS", 0))
@@ -47,7 +46,6 @@ retriever = None
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global llm, retriever
-
     startup_logs = []
     
     llm = Llama(
@@ -117,15 +115,17 @@ class AnswerResponse(BaseModel):
     sources: List[SourceDocument] = []
 
 # --- 8. API 엔드포인트 ---
-# server.py의 ask_question 함수
-
 @app.post("/ask", response_model=AnswerResponse)
 async def ask_question(request: QuestionRequest):
     user_question = request.question
     print(f"\n[입력 질문]: {user_question}")
 
-    # 가드레일: 질문 의도 분류
-    civil_complaint_keywords = ["법", "규정", "절차", "신고", "허가", "과태료", "문의", "소유권", "양도", "상속", "취득"]
+    civil_complaint_keywords = [
+        "법", "규정", "절차", "신고", "허가", "과태료", "문의", "소유권", "양도", 
+        "상속", "취득", "요건", "자격", "제한", "대상", "처분", "의무", "설치",
+        "농지", "토지", "지목", "임야", "농업", "영농", "농막", "농업인", "재배",
+        "경우", "무엇인가요", "어떻게", "가능", "불가능"
+    ]
     if not any(keyword in user_question for keyword in civil_complaint_keywords):
         answer = "저는 법률 및 민원 관련 질문에만 답변할 수 있습니다."
         print(f"[판단] 민원 관련 질문이 아님. 기본 응답 반환.")
@@ -149,13 +149,18 @@ async def ask_question(request: QuestionRequest):
             print(f"[metadata]: {doc.metadata}")
         print("---------------")
 
-    context = "\n---\n".join([doc.page_content for doc in docs])
+    context_parts = []
+    for doc in docs:
+        content = doc.page_content
+        if "답변:" in content:
+            context_parts.append(content.split("답변:", 1)[1].strip())
+        else:
+            context_parts.append(content)
+    context = "\n---\n".join(context_parts)
     
     answer_generation_prompt = f"""[지시]
-당신은 오직 '[정보]' 섹션에 제공된 법률 문서 내용만을 사용하여 '[질문]'에 답변하는 법률 AI입니다.
-주어진 '[정보]'에 질문에 대한 답변 근거가 전혀 없다면, **"제공된 정보만으로는 답변할 수 없습니다."** 라고만 답변하세요.
-절대로 당신의 지식을 사용하거나 정보를 추측해서 답변하면 안 됩니다.
-답변은 민원인이 이해하기 쉽게 핵심 내용을 요약하여 3~5문장 이내로 간결하게 작성하세요.
+당신은 법률 AI입니다. '[정보]'에 있는 내용을 바탕으로, 사용자의 '[질문]'에 대한 답변을 3~5 문장으로 요약해서 설명해주세요.
+'[정보]'에 없는 내용은 절대로 언급하지 마세요.
 
 [정보]
 {context}
@@ -167,21 +172,20 @@ async def ask_question(request: QuestionRequest):
 """
 
     response = await run_in_threadpool(
-        llm, answer_generation_prompt, max_tokens=512, stop=["[지시]", "[정보]", "[질문]"]
+        llm, answer_generation_prompt, max_tokens=512, stop=["[지시]", "[정보]", "[질문]", "\n"]
     )
     raw_answer = response['choices'][0]['text'].strip()
     
-    # --- [최종 수정] 강력한 후처리 로직 ---
-    # 1. 기본적인 [답변] 마커 제거
-    clean_answer = raw_answer.replace("[답변]", "").strip()
-
-    # 2. 반복적으로 나타나는 불필요한 상용구나 쓰레기 문자열의 시작점을 기준으로 분리하여, 그 앞부분(정상 답변)만 사용
-    stop_phrases = ["제시된 정보만으로는", "](본문)"]
-    for phrase in stop_phrases:
-        if phrase in clean_answer:
-            clean_answer = clean_answer.split(phrase)[0].strip()
-    
-    answer = clean_answer
+    cannot_answer_phrase = "제공된 정보로는 답변을 찾을 수 없습니다."
+    if cannot_answer_phrase in raw_answer:
+        answer = cannot_answer_phrase
+    else:
+        clean_answer = raw_answer.replace("[답변]", "").strip()
+        last_period_index = clean_answer.rfind('다.')
+        if last_period_index != -1:
+            answer = clean_answer[:last_period_index + 2]
+        else:
+            answer = clean_answer
     
     print(f"[생성된 답변]: {answer[:150]}...")
 
