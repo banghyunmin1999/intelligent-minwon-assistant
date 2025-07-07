@@ -6,7 +6,7 @@ from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel, Field
 from typing import List, Dict, Any
 import traceback
-import time # [추가] 시간 측정을 위해 임포트
+import time
 
 from langchain_postgres.vectorstores import PGVector
 from langchain_huggingface import HuggingFaceEmbeddings
@@ -49,12 +49,12 @@ PGVector.acreate_vector_extension = do_nothing
 
 # --- 전역 변수 선언 ---
 llm = None
-retriever = None
+# retriever = None # RAG를 사용하지 않으므로 주석 처리
 
 # --- lifespan 이벤트 핸들러 ---
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global llm, retriever
+    global llm #, retriever
     
     llm = Llama(
         model_path=MODEL_PATH,
@@ -66,24 +66,13 @@ async def lifespan(app: FastAPI):
         temperature=LLM_TEMPERATURE,
         repeat_penalty=LLM_REPEAT_PENALTY
     )
-    embeddings = HuggingFaceEmbeddings(
-        model_name=EMBEDDING_MODEL,
-        model_kwargs={'device': EMBEDDING_DEVICE},
-        encode_kwargs={'normalize_embeddings': True}
-    )
-    engine = create_async_engine(CONNECTION_STRING)
-    vector_store = await PGVector.afrom_existing_index(
-        embedding=embeddings,
-        collection_name=COLLECTION_NAME,
-        connection=engine,
-        use_jsonb=True,
-    )
     
-    base_retriever = vector_store.as_retriever(search_kwargs={"k": 3})
-    embeddings_filter = EmbeddingsFilter(embeddings=embeddings, similarity_threshold=0.75)
-    retriever = ContextualCompressionRetriever(
-        base_compressor=embeddings_filter, base_retriever=base_retriever
-    )
+    # RAG를 사용하지 않으므로 DB 관련 초기화는 불필요
+    # embeddings = HuggingFaceEmbeddings(...)
+    # engine = create_async_engine(CONNECTION_STRING)
+    # vector_store = await PGVector.afrom_existing_index(...)
+    # base_retriever = vector_store.as_retriever(...)
+    # retriever = ContextualCompressionRetriever(...)
 
     print("\n>> AI 모델 워밍업을 시작합니다...", flush=True)
     try:
@@ -93,7 +82,7 @@ async def lifespan(app: FastAPI):
         print(f"⚠️ 워밍업 중 오류 발생: {e}", flush=True)
     
     startup_logs = []
-    startup_logs.append("-------------------- SERVER STATUS --------------------")
+    startup_logs.append("-------------------- SERVER STATUS (LLM Only Test Mode) --------------------")
     startup_logs.append(f"✅ LLM 모델: {os.path.basename(MODEL_PATH) if MODEL_PATH else 'N/A'}")
     if torch.cuda.is_available():
         gpu_name = torch.cuda.get_device_name(0)
@@ -103,9 +92,7 @@ async def lifespan(app: FastAPI):
         startup_logs.append("⚠️ GPU 상태: CUDA 사용 불가")
     startup_logs.append(f"✅ LLM 스레드 수: {LLM_N_THREADS}개")
     startup_logs.append(f"✅ LLM 컨텍스트 크기: {LLM_N_CTX}")
-    startup_logs.append(f"✅ 임베딩 모델: {EMBEDDING_MODEL}")
-    startup_logs.append(f"✅ VectorDB 컬렉션: {COLLECTION_NAME}")
-    startup_logs.append("-----------------------------------------------------")
+    startup_logs.append("-----------------------------------------------------------------------")
 
     for log in startup_logs:
         print(log, flush=True)
@@ -140,100 +127,51 @@ async def ask_question(request: QuestionRequest):
     user_question = request.question
     print(f"\n[입력 질문]: {user_question}", flush=True)
 
-    # --- [수정] 성능 측정 로직 추가 ---
     t_start_total = time.time()
     performance_logs = []
 
     try:
-        civil_complaint_keywords = [
-            "법", "규정", "절차", "신고", "허가", "과태료", "문의", "소유권", "양도", 
-            "상속", "취득", "요건", "자격", "제한", "대상", "처분", "의무", "설치",
-            "농지", "토지", "지목", "임야", "농업", "영농", "농막", "농업인", "재배",
-            "경우", "무엇인가요", "어떻게", "가능", "불가능"
-        ]
-        if not any(keyword in user_question for keyword in civil_complaint_keywords):
-            answer = "저는 법률 및 민원 관련 질문에만 답변할 수 있습니다."
-            print(f"[판단] 민원 관련 질문이 아님. 기본 응답 반환.", flush=True)
-            return AnswerResponse(question=user_question, answer=answer, sources=[])
-
-        if retriever is None:
-            return AnswerResponse(question=user_question, answer="오류: 서버가 아직 준비되지 않았습니다.", sources=[])
-
-        # 1. 문서 검색(Retrieval) 시간 측정
-        t_start_retrieval = time.time()
-        docs = await retriever.ainvoke(user_question)
-        t_end_retrieval = time.time()
-        performance_logs.append(f"  - 문서 검색(Retrieval): {t_end_retrieval - t_start_retrieval:.4f} 초")
-
-        if not docs:
-            answer = "관련된 정보를 찾을 수 없습니다. 좀 더 구체적으로 질문해주시겠어요?"
-            print("[결과] 벡터DB에서 관련된 문서를 찾지 못함.", flush=True)
-            return AnswerResponse(question=user_question, answer=answer, sources=[])
-
-        print("\n[필터링 후 검색된 문서]", flush=True)
-        for i, doc in enumerate(docs, 1):
-            print(f"--- 문서 {i} ---", flush=True)
-            print(doc.page_content, flush=True)
-            if hasattr(doc, "metadata"):
-                print(f"[metadata]: {doc.metadata}", flush=True)
-            print("---------------", flush=True)
-
-        context_parts = []
-        for doc in docs:
-            content = doc.page_content
-            if "답변:" in content:
-                context_parts.append(content.split("답변:", 1)[1].strip())
-            else:
-                context_parts.append(content)
-        context = "\n---\n".join(context_parts)
-        
+        # [수정] RAG 비활성화에 맞춰 프롬프트 지시 변경
         answer_generation_prompt = f"""[지시]
-당신은 법률 AI입니다. '[정보]'에 있는 내용을 바탕으로, 사용자의 '[질문]'에 대한 답변을 3~5 문장으로 요약해서 설명해주세요.
-'[정보]'에 없는 내용은 절대로 언급하지 마세요.
-
-[정보]
-{context}
+당신은 사용자의 '[질문]'에 대해 아는 대로 상세히 답변하는 AI입니다.
 
 [질문]
 {user_question}
 
 [답변]
 """
-        # 2. 답변 생성(Inference) 시간 측정
+        # 답변 생성(Inference) 시간 측정
         t_start_inference = time.time()
         response = await run_in_threadpool(
-            llm, answer_generation_prompt, max_tokens=LLM_MAX_TOKENS, stop=["[지시]", "[정보]", "[질문]"]
+            llm, 
+            answer_generation_prompt, 
+            max_tokens=LLM_MAX_TOKENS, 
+            stop=["[지시]", "[정보]", "[질문]"]
         )
         t_end_inference = time.time()
         performance_logs.append(f"  - 답변 생성(LLM Inference): {t_end_inference - t_start_inference:.4f} 초")
         
         raw_answer = response['choices'][0]['text'].strip()
         
-        cannot_answer_phrase = "제공된 정보로는 답변을 찾을 수 없습니다."
-        if cannot_answer_phrase in raw_answer:
-            answer = cannot_answer_phrase
+        # 후처리 로직
+        clean_answer = raw_answer.replace("[답변]", "").strip()
+        last_period_index = clean_answer.rfind('다.')
+        if last_period_index != -1:
+            answer = clean_answer[:last_period_index + 2]
         else:
-            # 1. '---'를 기준으로 답변과 불필요한 부분을 분리합니다.
-            main_answer_part = raw_answer.split('---')[0].strip()
-            clean_answer = main_answer_part.replace("[답변]", "").strip()
-            last_period_index = clean_answer.rfind('다.')
-            if last_period_index != -1:
-                answer = clean_answer[:last_period_index + 2]
-            else:
-                answer = clean_answer
+            answer = clean_answer
         
-        # 3. 최종 성능 로그 출력
+        # 최종 성능 로그 출력
         t_end_total = time.time()
         performance_logs.append(f"  - 총 처리 시간: {t_end_total - t_start_total:.4f} 초")
-        print("\n[성능 측정 결과]", flush=True)
+        print("\n[성능 측정 결과 (LLM Only)]", flush=True)
         for log in performance_logs:
             print(log, flush=True)
         print("---------------", flush=True)
 
         print(f"[생성된 답변]: {answer[:150]}...", flush=True)
 
-        source_documents = [SourceDocument(page_content=doc.page_content, metadata=doc.metadata) for doc in docs]
-        return AnswerResponse(question=user_question, answer=answer, sources=source_documents)
+        return AnswerResponse(question=user_question, answer=answer, sources=[])
 
     except Exception as e:
         error_details = traceback.format_exc()

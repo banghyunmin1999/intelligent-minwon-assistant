@@ -5,17 +5,21 @@ pydantic
 
 # --- LangChain 및 AI 모델 ---
 langchain
+langchain-core
+langchain-community  # [추가] 누락된 라이브러리
+langchain-postgres
 langchain-huggingface
 sentence-transformers
-langchain-postgres
 llama-cpp-python
 
-# --- 데이터베이스 연결 ---
+# --- 데이터베이스 및 비동기 ---
+sqlalchemy
+asyncpg
 psycopg2-binary
-asyncpg # 비동기 드라이버 추가
+psycopg-binary
+
+# --- 딥러닝 백엔드 ---
+torch
 
 # --- 유틸리티 ---
 python-dotenv
-
-# --- GPU 체크 및 사용 ---
-torch
