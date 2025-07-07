@@ -6,7 +6,7 @@ from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel, Field
 from typing import List, Dict, Any
 import traceback
-import time # [추가] 시간 측정을 위해 임포트
+import time
 
 from langchain_postgres.vectorstores import PGVector
 from langchain_huggingface import HuggingFaceEmbeddings
@@ -25,7 +25,7 @@ if os.path.exists(dotenv_path):
     load_dotenv(dotenv_path=dotenv_path)
 
 # --- 2. 설정 값 읽기 및 자동 계산 ---
-LLM_N_THREADS = int(os.getenv("LLM_N_THREADS", 4)) # 기본값 4
+LLM_N_THREADS = int(os.getenv("LLM_N_THREADS", 4))
 EMBEDDING_DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 MODEL_PATH = os.getenv("MODEL_PATH")
 LLM_N_GPU_LAYERS = int(os.getenv("LLM_N_GPU_LAYERS", -1))
@@ -33,7 +33,7 @@ LLM_N_CTX = int(os.getenv("LLM_N_CTX", 2048))
 LLM_N_BATCH = int(os.getenv("LLM_N_BATCH", 1))
 LLM_REPEAT_PENALTY = float(os.getenv("LLM_REPEAT_PENALTY", 1.1))
 LLM_TEMPERATURE = float(os.getenv("LLM_TEMPERATURE", 0.2))
-LLM_MAX_TOKENS = int(os.getenv("LLM_MAX_TOKENS", 512))
+LLM_MAX_TOKENS = int(os.getenv("LLM_MAX_TOKENS", 256))
 EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "jhgan/ko-sroberta-multitask")
 PG_HOST = os.getenv("DB_HOST")
 PG_PORT = os.getenv("DB_PORT")
@@ -79,7 +79,7 @@ async def lifespan(app: FastAPI):
         use_jsonb=True,
     )
     
-    base_retriever = vector_store.as_retriever(search_kwargs={"k": 3})
+    base_retriever = vector_store.as_retriever(search_kwargs={"k": 5})
     embeddings_filter = EmbeddingsFilter(embeddings=embeddings, similarity_threshold=0.75)
     retriever = ContextualCompressionRetriever(
         base_compressor=embeddings_filter, base_retriever=base_retriever
@@ -140,7 +140,6 @@ async def ask_question(request: QuestionRequest):
     user_question = request.question
     print(f"\n[입력 질문]: {user_question}", flush=True)
 
-    # --- [수정] 성능 측정 로직 추가 ---
     t_start_total = time.time()
     performance_logs = []
 
@@ -159,7 +158,6 @@ async def ask_question(request: QuestionRequest):
         if retriever is None:
             return AnswerResponse(question=user_question, answer="오류: 서버가 아직 준비되지 않았습니다.", sources=[])
 
-        # 1. 문서 검색(Retrieval) 시간 측정
         t_start_retrieval = time.time()
         docs = await retriever.ainvoke(user_question)
         t_end_retrieval = time.time()
@@ -199,10 +197,12 @@ async def ask_question(request: QuestionRequest):
 
 [답변]
 """
-        # 2. 답변 생성(Inference) 시간 측정
         t_start_inference = time.time()
         response = await run_in_threadpool(
-            llm, answer_generation_prompt, max_tokens=LLM_MAX_TOKENS, stop=["[지시]", "[정보]", "[질문]"]
+            llm, 
+            answer_generation_prompt, 
+            max_tokens=LLM_MAX_TOKENS,
+            stop=["[지시]", "[정보]", "[질문]"]
         )
         t_end_inference = time.time()
         performance_logs.append(f"  - 답변 생성(LLM Inference): {t_end_inference - t_start_inference:.4f} 초")
@@ -213,16 +213,12 @@ async def ask_question(request: QuestionRequest):
         if cannot_answer_phrase in raw_answer:
             answer = cannot_answer_phrase
         else:
-            # 1. '---'를 기준으로 답변과 불필요한 부분을 분리합니다.
+            # --- [수정] '다.'로 자르는 로직 비활성화 ---
+            # '---' 패턴이나 '[답변]' 마커만 제거하고, 모델의 원본 출력을 최대한 그대로 둡니다.
             main_answer_part = raw_answer.split('---')[0].strip()
-            clean_answer = main_answer_part.replace("[답변]", "").strip()
-            last_period_index = clean_answer.rfind('다.')
-            if last_period_index != -1:
-                answer = clean_answer[:last_period_index + 2]
-            else:
-                answer = clean_answer
+            answer = main_answer_part.replace("[답변]", "").strip()
+            # --- [수정 끝] ---
         
-        # 3. 최종 성능 로그 출력
         t_end_total = time.time()
         performance_logs.append(f"  - 총 처리 시간: {t_end_total - t_start_total:.4f} 초")
         print("\n[성능 측정 결과]", flush=True)
@@ -230,7 +226,7 @@ async def ask_question(request: QuestionRequest):
             print(log, flush=True)
         print("---------------", flush=True)
 
-        print(f"[생성된 답변]: {answer[:150]}...", flush=True)
+        print(f"[생성된 답변]: {answer[:250]}...", flush=True) # 로그 길이를 조금 늘려서 확인
 
         source_documents = [SourceDocument(page_content=doc.page_content, metadata=doc.metadata) for doc in docs]
         return AnswerResponse(question=user_question, answer=answer, sources=source_documents)

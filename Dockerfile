@@ -15,13 +15,11 @@
     COPY --from=builder /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
     COPY --from=builder /usr/local/bin /usr/local/bin
     
-    # [추가] 이 지점부터 캐시를 무효화할 수 있는 스위치를 만듭니다.
-    ARG CACHE_BUSTER
-    
-    # 애플리케이션 파일 복사 (이제 이 부분은 --build-arg 값에 따라 캐시가 무효화됩니다)
     COPY server.py .
     COPY .env .
-    COPY model/hyperclovax-seed-text-instruct-1.5b-q4_k_m.gguf ./model/
+    
+    # [수정] 새로운 1.5B 모델 파일을 복사하도록 경로 변경
+    COPY model/gemma-3-1b-thinking-v2-q4_k_m.gguf ./model/
     
     EXPOSE 8000
     

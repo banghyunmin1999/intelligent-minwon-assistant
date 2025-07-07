@@ -16,8 +16,14 @@
 *.csv
 *.json
 
+# GGUF 모델 파일
+*.gguf
+
 # # # 설치 파일 (Installers) # # #
 # 가상환경 디렉토리
+
+# # # Git에서 추적하지 않을 디렉토리 # # #
+/minwon_egov/
 venv/
 
 # Miniconda 설치 스크립트 파일

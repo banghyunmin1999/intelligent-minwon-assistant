@@ -13,7 +13,7 @@ PG_PASSWORD = "1234"
 COLLECTION_NAME = "minwon_qna_cases"
 
 # 모델 경로 설정
-model_path = "/home/bang/intelligent-minwon-assistant/models/llama-3-Korean-Bllossom-8B-gguf-Q4_K_M/llama-3-Korean-Bllossom-8B-Q4_K_M.gguf"
+model_path = "/home/bang/intelligent-minwon-assistant/models/llama-3-Korean-Bllossom-8B-Q2_K-GGUF/llama-3-korean-bllossom-8b-q2_k.gguf"
 
 # 모델 로드
 llm = Llama(
