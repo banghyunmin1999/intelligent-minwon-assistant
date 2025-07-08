@@ -51,8 +51,8 @@ intelligent-minwon-assistant/
 | :--- | :--- |
 | **AI 서버** | Python, FastAPI, LangChain, Llama.cpp |
 | **웹 서버** | Java 8, 전자정부 표준 프레임워크(Spring), Tomcat |
-| **데이터베이스** | PostgreSQL (with PGVector), MySQL |
-| **인프라/DevOps**| Docker, Minikube, Kubernetes, NGINX Ingress |
+| **데이터베이스** | PostgreSQL, MySQL |
+| **인프라/DevOps**| Docker, Minikube, Kubernetes |
 
 ## 🚀 로컬 환경 구축 및 실행 가이드
 
