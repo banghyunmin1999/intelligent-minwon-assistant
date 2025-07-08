@@ -1,0 +1,79 @@
+# kubernetes-manifests/ai-deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ai-server-deployment
+  labels:
+    app: ai-server
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ai-server
+  template:
+    metadata:
+      labels:
+        app: ai-server
+    spec:
+      containers:
+      - name: ai-server
+        # [수정] Docker Hub에 푸시한 이미지 주소를 사용합니다. (<ID>는 실제 ID로 변경)
+        image: banghyunmin1999/minwon-ai-server:v1
+        imagePullPolicy: IfNotPresent # 이미지가 로컬에 있으면 사용하고, 없으면 Hub에서 당겨옵니다.
+        ports:
+        - containerPort: 8000
+        env:
+          # [수정] ConfigMap과 Secret에서 환경 변수를 가져옵니다.
+          - name: MODEL_PATH
+            valueFrom:
+              configMapKeyRef:
+                name: ai-server-config
+                key: MODEL_PATH
+          - name: LLM_N_THREADS
+            valueFrom:
+              configMapKeyRef:
+                name: ai-server-config
+                key: LLM_N_THREADS
+          - name: LLM_N_GPU_LAYERS
+            valueFrom:
+              configMapKeyRef:
+                name: ai-server-config
+                key: LLM_N_GPU_LAYERS
+          - name: LLM_N_CTX
+            valueFrom:
+              configMapKeyRef:
+                name: ai-server-config
+                key: LLM_N_CTX
+          - name: LLM_MAX_TOKENS
+            valueFrom:
+              configMapKeyRef:
+                name: ai-server-config
+                key: LLM_MAX_TOKENS
+          - name: DB_HOST
+            valueFrom:
+              configMapKeyRef:
+                name: ai-server-config
+                key: DB_HOST
+          - name: DB_PORT
+            valueFrom:
+              configMapKeyRef:
+                name: ai-server-config
+                key: DB_PORT
+          - name: DB_NAME
+            valueFrom:
+              configMapKeyRef:
+                name: ai-server-config
+                key: DB_NAME
+          - name: DB_USER
+            valueFrom:
+              secretKeyRef:
+                name: db-secrets
+                key: AI_DB_USER
+          - name: DB_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: db-secrets
+                key: AI_DB_PASSWORD
+        resources:
+          limits:
+            nvidia.com/gpu: 1 # GPU 1개 사용을 요청합니다.

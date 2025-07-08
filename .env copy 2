@@ -1,0 +1,25 @@
+# =================================================
+# 지능형 농지민원 답변 시스템 설정 파일 (로컬 테스트용)
+# =================================================
+
+### LLM Model Settings ###
+# [로컬 테스트용 수정] WSL의 실제 파일 전체 경로로 변경
+MODEL_PATH=/home/bang/intelligent-minwon-assistant/model/gemma-3-1b-thinking-v2-q4_k_m.gguf
+LLM_N_THREADS=12
+LLM_N_GPU_LAYERS=-1
+LLM_N_CTX=2048
+LLM_MAX_TOKENS=256
+LLM_N_BATCH=1
+LLM_REPEAT_PENALTY=1.1
+LLM_TEMPERATURE=0.2
+
+### Embedding Model Settings ###
+EMBEDDING_MODEL="jhgan/ko-sroberta-multitask"
+
+### VectorDB (PostgreSQL) Settings ###
+# [로컬 테스트용 수정] host.docker.internal 대신 localhost 사용
+DB_HOST=localhost
+DB_PORT=5432
+DB_NAME=minwon_pg_db
+DB_USER=minwon_user
+DB_PASSWORD=1234

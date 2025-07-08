@@ -1,0 +1,25 @@
+# --- 웹 프레임워크 및 서버 ---
+fastapi
+uvicorn[standard]
+pydantic
+
+# --- LangChain 및 AI 모델 ---
+langchain
+langchain-core
+langchain-community  # [추가] 누락된 라이브러리
+langchain-postgres
+langchain-huggingface
+sentence-transformers
+llama-cpp-python
+
+# --- 데이터베이스 및 비동기 ---
+sqlalchemy
+asyncpg
+psycopg2-binary
+psycopg-binary
+
+# --- 딥러닝 백엔드 ---
+torch
+
+# --- 유틸리티 ---
+python-dotenv

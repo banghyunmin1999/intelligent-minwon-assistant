@@ -1,0 +1,53 @@
+# # =================================================
+# # 지능형 농지민원 답변 시스템 설정 파일 (1.5B 모델 교체 버전)
+# # =================================================
+
+# ### LLM Model Settings ###
+# # [수정] 모델 경로를 새로운 1.5B 모델 파일명으로 변경
+# MODEL_PATH=/app/model/hyperclovax-seed-text-instruct-1.5b-q4_k_m.gguf
+
+# # [수정] 모델이 매우 가벼우므로 모든 레이어를 GPU에 할당
+# LLM_N_GPU_LAYERS=-1
+
+# LLM_N_CTX=1048
+# LLM_MAX_TOKENS=128
+# LLM_N_BATCH=4
+# LLM_REPEAT_PENALTY=1.1
+# LLM_TEMPERATURE=0.2
+
+# ### Embedding Model Settings ###
+# EMBEDDING_MODEL="jhgan/ko-sroberta-multitask"
+
+# ### VectorDB (PostgreSQL) Settings ###
+# DB_HOST=host.docker.internal
+# DB_PORT=5432
+# DB_NAME=minwon_pg_db
+# DB_USER=minwon_user
+# DB_PASSWORD=1234
+
+
+# =================================================
+# 지능형 농지민원 답변 시스템 설정 파일 (로컬 테스트용)
+# =================================================
+
+### LLM Model Settings ###
+# [로컬 테스트용 수정] Docker 내부 경로가 아닌, 실제 WSL 경로로 변경
+MODEL_PATH=/home/bang/intelligent-minwon-assistant/model/hyperclovax-seed-text-instruct-1.5b-q4_k_m.gguf
+
+LLM_N_GPU_LAYERS=-1
+LLM_N_CTX=1048
+LLM_MAX_TOKENS=128
+LLM_N_BATCH=1
+LLM_REPEAT_PENALTY=1.1
+LLM_TEMPERATURE=0.2
+
+### Embedding Model Settings ###
+EMBEDDING_MODEL="jhgan/ko-sroberta-multitask"
+
+### VectorDB (PostgreSQL) Settings ###
+# [로컬 테스트용 수정] host.docker.internal 대신 localhost 사용
+DB_HOST=localhost
+DB_PORT=5432
+DB_NAME=minwon_pg_db
+DB_USER=minwon_user
+DB_PASSWORD=1234

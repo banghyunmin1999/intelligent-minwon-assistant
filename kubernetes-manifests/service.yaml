@@ -1,0 +1,26 @@
+# kubernetes-manifests/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: ai-server-service
+spec:
+  selector:
+    app: ai-server
+  ports:
+  - port: 8000
+    targetPort: 8000
+    nodePort: 30001
+  type: NodePort
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: egov-server-service
+spec:
+  selector:
+    app: egov-server
+  ports:
+  - port: 8080
+    targetPort: 8080
+    nodePort: 30002
+  type: NodePort

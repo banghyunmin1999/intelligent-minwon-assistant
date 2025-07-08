@@ -1,0 +1,25 @@
+# kubernetes-manifests/egov-deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: egov-server-deployment
+  labels:
+    app: egov-server
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: egov-server
+  template:
+    metadata:
+      labels:
+        app: egov-server
+    spec:
+      containers:
+      - name: egov-server
+        image: banghyunmin1999/egov-server:v1
+        ports:
+        - containerPort: 8080
+        env:
+        - name: CATALINA_OPTS
+          value: "-Djava.security.egd=file:/dev/./urandom"
