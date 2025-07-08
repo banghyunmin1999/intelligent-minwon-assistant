@@ -14,48 +14,34 @@
 
 데이터베이스는 호스트 PC에서 직접 실행하고, 애플리케이션 서버들만 쿠버네티스 위에서 실행합니다.
 
-```
-[ Developer's PC (Windows + WSL2) ]
-+------------------------------------------------------+
-| [ PostgreSQL ]      [ MySQL ]                        |  <-- DB는 PC(호스트)에서 직접 실행
-+------------------------------------------------------+
-       ^                                  ^
-       | (host.minikube.internal)         | (host.minikube.internal)
-       |                                  |
-+------------------------------------------------------+
-| [ Minikube Kubernetes Node (Docker 기반 VM) ]          |
-|                                                      |
-|   +-------------------+  <---------->  +-------------------------+
-|   |  Pod: egov-server |  (내부 서비스명)    |  Pod: ai-server         |
-|   |  (Java/Tomcat)   |                  |  (Python/FastAPI/GPU)   |
-|   +-------------------+                  +-------------------------+
-|          ^
-|          | Ingress Controller (minwon.local)
-|          |
-+----------+-------------------------------------------+
-           |
-[ 개발자 / 웹 브라우저 ]
-```
+
+<img src="https://github.com/user-attachments/assets/ca519a87-06ea-4be7-9002-c94eeca0c62e" width="600">
+
 
 ## 디렉토리 구조
 
 ```
 intelligent-minwon-assistant/
-├── egov-project/                  # 전자정부프레임워크 프로젝트
-│   ├── Dockerfile
-│   ├── pom.xml
-│   ├── docker.globals.properties  # (선택) Docker 볼륨 마운트용 설정
-│   └── src/
-├── minwon-ai-server/              # AI 서버 프로젝트
-│   ├── Dockerfile
-│   ├── .env
-│   ├── ingestion.py
-│   ├── server.py
-│   └── requirements.txt
-├── kubernetes-manifests/          # 쿠버네티스 YAML 파일
-│   ├── config-and-secrets.yaml
-│   ├── deployment.yaml
-│   └── network.yaml
+├── kubernetes-manifests/            # 쿠버네티스 리소스 정의
+│   ├── ai-deployment.yaml           # AI 서버 Deployment (GPU 리소스 요청 포함)
+│   ├── egov-deployment.yaml         # eGov 서버 Deployment (Tomcat + WAR 이미지)
+│   ├── service.yaml                 # 두 서비스(NodePort 30001/30002)
+│   ├── ingress.yaml                 # nginx-ingress 경로(/ai, /egov)
+│   ├── config-and-secrets.yaml      # ConfigMap & Secret (DB, 모델 경로 등)
+│   └── start_servers.sh             # 로컬 포트포워딩(8000/8080) 스크립트
+│
+├── minwon-ai-server/                # AI FastAPI 애플리케이션
+│   ├── Dockerfile                   # 다단계 빌드 + CUDA 기반 이미지
+│   ├── requirements.txt             # Python 의존성
+│   ├── server.py                    # FastAPI 엔트리포인트
+│   ├── ingestion.py                 # 임베딩/벡터화 파이프라인
+│   └── .env                         # AI 서버용 예시 환경변수
+│
+├── egov-server/                     # 전자정부프레임워크(Spring) 애플리케이션
+│   ├── Dockerfile                   # Tomcat 기반 이미지 빌드
+│   ├── ROOT.war                     # 빌드 산출물
+│   ├── pom.xml                      # Maven 설정
+│   └── src/                         # Java 소스 코드
 └── README.md
 ```
 
@@ -133,17 +119,41 @@ cd ~/intelligent-minwon-assistant/kubernetes-manifests
 kubectl apply -f .
 ```
 
-#### **6단계: 상태 확인 및 접속**
+#### **5단계: 상태 확인 및 애플리케이션 접속**
 
-1.  **파드 상태 확인**: 모든 파드가 `Running` 상태가 될 때까지 기다립니다.
+`kubectl apply`로 배포를 완료한 후, 아래 절차에 따라 파드들의 상태를 확인하고, 포트포워딩을 통해 외부에서 애플리케이션에 접속합니다.
+
+ **1. 파드(Pod) 상태 확인**
+
+아래 명령어로 두 개의 애플리케이션 파드가 생성되고 `Running` 상태로 전환되는 것을 실시간으로 확인합니다.
+
+```bash
+kubectl get pods -w
+```
+
+> **[확인]** `ai-server-deployment-...`와 `egov-server-deployment-...` 두 파드가 모두 `STATUS` `Running`, `READY` `1/1`이 될 때까지 기다립니다.
+
+ **2. 로컬 포트포워딩 실행**
+
+`start_servers.sh` 스크립트를 실행하여, 로컬 PC의 포트와 쿠버네티스 파드의 포트를 직접 연결합니다.
+
+1.  **별도의 새 터미널**을 엽니다.
+2.  아래 명령어를 실행합니다.
     ```bash
-    kubectl get pods -w
+    cd kubernetes-manifests
+    ./start_servers.sh
     ```
-2.  **`hosts` 파일 설정**:
-      * `minikube ip` 명령어로 클러스터 IP를 확인합니다.
-      * Windows의 `C:\Windows\System32\drivers\etc\hosts` 파일을 관리자 권한으로 열어, 맨 아래에 `<minikube_ip> minwon.local` 한 줄을 추가합니다. (예: `192.168.49.2 minwon.local`)
-3.  **터널 실행**: **별도의 새 터미널**을 열고 아래 명령어를 실행합니다. **이 터미널은 접속하는 동안 계속 켜두어야 합니다.**
-    ```bash
-    minikube tunnel
-    ```
-4.  **최종 접속**: 웹 브라우저에서 `http://minwon.local` 주소로 접속합니다.
+
+> **[중요]** 이 스크립트가 실행 중인 터미널은 접속하는 동안 **계속 켜두어야 합니다.**
+
+ **3. 웹 브라우저 및 API 클라이언트로 최종 접속**
+
+이제 `localhost`를 통해 각 서버에 직접 접속할 수 있습니다.
+
+  * **전자정부 서버 접속**:
+
+      * 웹 브라우저를 열고 주소창에 **`http://localhost:8080/main.do`** 를 입력합니다.
+
+  * **AI 서버 API 테스트**:
+
+      * API 테스트 도구(Postman, curl 등)를 사용하여 **`http://localhost:8000/docs`** 로 테스트를 진행합니다.
