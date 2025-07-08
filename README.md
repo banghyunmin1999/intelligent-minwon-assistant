@@ -1,100 +1,149 @@
-네, 알겠습니다. `intelligent-minwon-assistant` 프로젝트의 시작을 위해 `README.md` 파일을 생성해 드리겠습니다. 이 파일은 프로젝트의 목표, 아키텍처, 기술 스택, 그리고 시작 방법을 명확하게 설명하는 것을 목표로 합니다.
 
------
 
-# 지능형 민원 처리 어시스턴트 (Intelligent Minwon Assistant)
+# 지능형 농지민원 어시스턴트
 
-[](https://www.gitops.tech/) [](https://kubernetes.io/) [](https://github.com/features/actions) [](https://argoproj.github.io/argo-cd/)
+**지능형 농지민원 답변 시스템 (Intelligent Civil Complaint Assistant)**
 
-이 프로젝트는 전자정부프레임워크 기반의 민원 게시판과 지능형 AI 엔진을 연동하여, 민원 처리를 자동화하고 효율화하는 것을 목표로 합니다. 모든 인프라와 애플리케이션 배포는 **GitOps 철학**에 기반하여 완전 자동으로 관리됩니다.
+[](https://kubernetes.io/) [](https://www.docker.com/) [](https://fastapi.tiangolo.com/) [](https://www.java.com/) [](https://www.postgresql.org/)
 
-## 📌 주요 기능
+## 🎯 프로젝트 개요
 
-  * **민원 게시판**: 전자정부 표준프레임워크로 개발된 웹 기반 민원 접수 및 조회 시스템.
-  * **AI 어시스턴트**: 접수된 민원의 내용을 분석하고, 관련 규정이나 답변을 추천하는 FastAPI 기반 AI 엔진.
-  * **완전 자동화된 배포**: `Git`에 코드를 푸시하는 것만으로 테스트, 빌드, 배포가 자동으로 이루어지는 CI/CD 파이프라인.
+본 프로젝트는 전자정부 표준 프레임워크 기반의 민원 게시판 웹 애플리케이션과, RAG(검색 증강 생성) 기술을 활용한 AI 답변 서버를 연동하는 시스템입니다. 두 애플리케이션은 각각 독립적인 Docker 컨테이너로 패키징되며, 로컬 개발 환경에서는 Minikube를 사용하여 쿠버네티스 클러스터 위에 배포 및 운영됩니다.
 
------
+## 🏗️ 아키텍처 (로컬 개발 환경)
 
-## 🏗️ 아키텍처
+데이터베이스는 호스트 PC에서 직접 실행하고, 애플리케이션 서버들만 쿠버네티스 위에서 실행합니다.
 
-본 프로젝트는 Git 저장소를 '단일 진실 공급원(Single Source of Truth)'으로 사용하는 GitOps 방식을 따릅니다. 개발자가 코드를 변경하면, 인프라와 애플리케이션이 자동으로, 그리고 예측 가능하게 업데이트됩니다.
+```
+[ Developer's PC (Windows + WSL2) ]
++------------------------------------------------------+
+| [ PostgreSQL ]      [ MySQL ]                        |  <-- DB는 PC(호스트)에서 직접 실행
++------------------------------------------------------+
+       ^                                  ^
+       | (host.minikube.internal)         | (host.minikube.internal)
+       |                                  |
++------------------------------------------------------+
+| [ Minikube Kubernetes Node (Docker 기반 VM) ]          |
+|                                                      |
+|   +-------------------+  <---------->  +-------------------------+
+|   |  Pod: egov-server |  (내부 서비스명)    |  Pod: ai-server         |
+|   |  (Java/Tomcat)   |                  |  (Python/FastAPI/GPU)   |
+|   +-------------------+                  +-------------------------+
+|          ^
+|          | Ingress Controller (minwon.local)
+|          |
++----------+-------------------------------------------+
+           |
+[ 개발자 / 웹 브라우저 ]
+```
 
-**배포 흐름:**
-`개발자 코드 Push` ➡️ `Git 저장소` ➡️ `① GitHub Actions (CI)` ➡️ `② 컨테이너 레지스트리` ➡️ `③ Argo CD (CD)` ➡️ `④ 쿠버네티스 클러스터`
-
-1.  **CI (GitHub Actions)**: 코드 변경을 감지하여 Docker 이미지를 빌드하고 레지스트리에 푸시합니다.
-2.  **CD (Argo CD)**: Git 저장소의 Kubernetes 설정 파일 변경을 감지하고, 클러스터의 상태를 Git에 정의된 상태와 자동으로 일치시킵니다.
-
------
-
-## 🛠️ 기술 스택 (Tech Stack)
-
-모든 컴포넌트는 비용 부담이 없는 오픈소스 및 자체 구축 가능한(Self-hosted) 도구로 구성됩니다.
-
-| 구분                  | 기술                                         | 설명                                   |
-| --------------------- | -------------------------------------------- | -------------------------------------- |
-| **애플리케이션** | FastAPI, e-Gov Framework (Spring/Java)       | AI 엔진 및 민원 게시판 서버            |
-| **데이터베이스** | PostgreSQL                                   | 민원 데이터 저장                       |
-| **컨테이너** | Docker                                       | 애플리케이션 컨테이너화                |
-| **오케스트레이션** | Kubernetes (Minikube, k3s)                   | 컨테이너 관리 및 오케스트레이션        |
-| **CI/CD** | GitHub Actions, Argo CD                      | 지속적 통합 및 배포 (GitOps)           |
-| **인프라 설정 관리** | Kustomize                                    | 환경별 Kubernetes 설정 관리            |
-| **이미지 레지스트리** | Harbor, GitHub Packages (GHCR)               | Docker 이미지 저장소 (자체 구축)       |
-| **파일 스토리지** | MinIO                                        | AI 모델 등 대용량 파일 저장소 (자체 구축) |
-| **모니터링** | Prometheus, Grafana                          | 시스템 메트릭 수집 및 시각화           |
-
------
-
-## 📁 디렉토리 구조
+## 디렉토리 구조
 
 ```
 intelligent-minwon-assistant/
-├── ai-engine/
-│   └── Dockerfile              # ✅ AI 서버 Dockerfile (완료)
-├── egov-server/
-│   ├── src/                    # 📋 전자정부프레임워크 소스
-│   ├── pom.xml                 # (또는 build.gradle)
-│   └── Dockerfile              # 📝 전자정부 서버 Dockerfile (생성 예정)
-├── k8s/
-│   ├── deployment.yaml         # 🚀 쿠버네티스 배포 설정 (생성 예정)
-│   └── ingress.yaml            # 🌐 외부 접속 설정 (생성 예정)
-├── server.py                   # ✅ AI 서버 파이썬 코드 (완료)
-└── requirements.txt            # ✅ AI 서버 파이썬 의존성 (완료)
+├── egov-project/                  # 전자정부프레임워크 프로젝트
+│   ├── Dockerfile
+│   ├── pom.xml
+│   ├── docker.globals.properties  # (선택) Docker 볼륨 마운트용 설정
+│   └── src/
+├── minwon-ai-server/              # AI 서버 프로젝트
+│   ├── Dockerfile
+│   ├── .env
+│   ├── ingestion.py
+│   ├── server.py
+│   └── requirements.txt
+├── kubernetes-manifests/          # 쿠버네티스 YAML 파일
+│   ├── config-and-secrets.yaml
+│   ├── deployment.yaml
+│   └── network.yaml
+└── README.md
 ```
 
------
+## 🛠️ 기술 스택
 
-## ⚙️ 시작하기 (Getting Started)
+| 구분 | 기술 |
+| :--- | :--- |
+| **AI 서버** | Python, FastAPI, LangChain, Llama.cpp |
+| **웹 서버** | Java 8, 전자정부 표준 프레임워크(Spring), Tomcat |
+| **데이터베이스** | PostgreSQL (with PGVector), MySQL |
+| **인프라/DevOps**| Docker, Minikube, Kubernetes, NGINX Ingress |
 
-### 사전 요구사항
+## 🚀 로컬 환경 구축 및 실행 가이드
 
-  * Git
-  * Docker
-  * Kubernetes (로컬 환경에서는 **Minikube** 또는 **k3s** 사용을 권장합니다.)
-  * kubectl
+#### **1단계: 사전 준비**
 
-### 로컬 환경 배포 절차 (요약)
+1.  **필수 프로그램 설치**: `Docker Desktop`, `WSL2`, `Minikube`, `kubectl`을 PC에 설치합니다.
+2.  **GPU 드라이버**: 최신 NVIDIA 드라이버를 설치합니다.
+3.  **데이터베이스 실행**: PC(호스트 또는 WSL)에 **PostgreSQL**과 **MySQL**을 설치하고 실행합니다.
+      * PostgreSQL에는 `CREATE EXTENSION IF NOT EXISTS vector;` 명령으로 pgvector 확장을 활성화해야 합니다.
 
-1.  **리포지토리 클론:**
+#### **2단계: 데이터 인덱싱**
 
+AI가 참고할 데이터를 벡터DB에 저장합니다.
+
+```bash
+# minwon-ai-server 폴더로 이동
+cd minwon-ai-server
+# 필요한 라이브러리 설치
+pip install -r requirements.txt
+# 데이터 인덱싱 스크립트 실행
+python ingestion.py
+```
+
+#### **3단계: Docker 이미지 빌드 및 푸시**
+
+두 개의 서버를 각각 Docker 이미지로 만들고 Docker Hub에 업로드합니다. (`<ID>`는 본인의 Docker Hub ID로 변경)
+
+```bash
+# 1. AI 서버 이미지 빌드 및 푸시
+cd ~/intelligent-minwon-assistant/minwon-ai-server
+docker build -t <ID>/minwon-ai-server:v1 .
+docker push <ID>/minwon-ai-server:v1
+
+# 2. 전자정부 서버 이미지 빌드 및 푸시
+cd ~/intelligent-minwon-assistant/egov-project
+docker build -t <ID>/egov-server:v1 .
+docker push <ID>/egov-server:v1
+```
+
+#### **4단계: Minikube 클러스터 시작 및 설정**
+
+GPU를 사용하는 쿠버네티스 클러스터를 시작하고, 외부 접속을 위한 설정을 합니다.
+
+```bash
+# 1. Minikube 클러스터 시작 (GPU 활성화)
+minikube start --driver=docker --gpus=all --cpus=4 --memory=8192
+
+# 2. NVIDIA Device Plugin 설치 (GPU 인식용)
+kubectl create -f https://raw.githubusercontent.com/NVIDIA/k8s-device-plugin/v0.14.1/nvidia-device-plugin.yml
+
+# 3. Ingress Controller 애드온 활성화
+minikube addons enable ingress
+```
+
+#### **5단계: 쿠버네티스에 애플리케이션 배포**
+
+작성된 YAML 파일들을 사용하여 클러스터에 두 서버를 배포합니다.
+
+```bash
+# kubernetes-manifests 폴더로 이동
+cd ~/intelligent-minwon-assistant/kubernetes-manifests
+
+# 모든 YAML 파일 적용
+kubectl apply -f .
+```
+
+#### **6단계: 상태 확인 및 접속**
+
+1.  **파드 상태 확인**: 모든 파드가 `Running` 상태가 될 때까지 기다립니다.
     ```bash
-    git clone [저장소 URL]
-    cd intelligent-minwon-assistant
+    kubectl get pods -w
     ```
-
-2.  **쿠버네티스 클러스터 실행:**
-
-      * Minikube, k3s 등 로컬 쿠버네티스 클러스터를 시작합니다.
-
-3.  **인프라 서비스 배포:**
-
-      * 클러스터에 Argo CD, MinIO, Harbor 등 기본 인프라를 배포합니다. (Helm 또는 Kustomize 사용)
-
-4.  **Argo CD 설정:**
-
-      * Argo CD가 이 Git 리포지토리의 `k8s/` 디렉토리를 바라보도록 Application을 생성합니다.
-
-5.  **자동 동기화:**
-
-      * Argo CD가 리포지토리의 내용을 클러스터에 자동으로 동기화하며 모든 애플리케이션(AI 엔진, 민원 게시판)을 배포합니다. 이후 `git push`만으로 모든 변경사항이 자동으로 반영됩니다.
+2.  **`hosts` 파일 설정**:
+      * `minikube ip` 명령어로 클러스터 IP를 확인합니다.
+      * Windows의 `C:\Windows\System32\drivers\etc\hosts` 파일을 관리자 권한으로 열어, 맨 아래에 `<minikube_ip> minwon.local` 한 줄을 추가합니다. (예: `192.168.49.2 minwon.local`)
+3.  **터널 실행**: **별도의 새 터미널**을 열고 아래 명령어를 실행합니다. **이 터미널은 접속하는 동안 계속 켜두어야 합니다.**
+    ```bash
+    minikube tunnel
+    ```
+4.  **최종 접속**: 웹 브라우저에서 `http://minwon.local` 주소로 접속합니다.
